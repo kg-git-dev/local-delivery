@@ -102,18 +102,17 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         if (empty(WC()->customer->get_shipping_postcode()) || empty(WC()->customer->get_shipping_city())) {
             return; // Skip validation if address isn't set yet
         }
-        
+
         $max_radius = $this->get_max_radius_for_cart();
         $out_of_range_products = [];
 
         foreach (WC()->cart->get_cart() as $cart_item) {
             $product_id = $cart_item['product_id'];
             if (get_post_meta($product_id, '_local_delivery_enabled', true) === 'yes') {
-                error_log("true");
                 $distance = $this->get_distance(
-                    WC()->customer->get_billing_address(),
-                    WC()->customer->get_billing_city(),
-                    WC()->customer->get_billing_postcode()
+                    WC()->customer->get_shipping_address(),
+                    WC()->customer->get_shipping_city(),
+                    WC()->customer->get_shipping_postcode()
                 );
                 if ($distance > $max_radius) {
                     $out_of_range_products[] = get_the_title($product_id);
@@ -122,7 +121,22 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         }
 
         if (!empty($out_of_range_products)) {
-            wc_add_notice(__('The following products cannot be delivered to your address and must be removed from the cart: ') . implode(', ', $out_of_range_products), 'error');
+            $error_message = __('The following products cannot be delivered to your address and must be removed from the cart: ') . implode(', ', $out_of_range_products);
+
+            // Check if the error message already exists
+            $notices = wc_get_notices('error');
+            $error_exists = false;
+
+            foreach ($notices as $notice) {
+                if (strpos($notice['notice'], $error_message) !== false) {
+                    $error_exists = true;
+                    break;
+                }
+            }
+
+            if (!$error_exists) {
+                wc_add_notice($error_message, 'error');
+            }
         }
     }
 }
