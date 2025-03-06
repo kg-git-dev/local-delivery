@@ -6,20 +6,26 @@ if (!defined('ABSPATH')) exit; // Exit if accessed directly
 add_action('woocommerce_product_options_shipping', 'add_local_delivery_checkbox');
 function add_local_delivery_checkbox() {
     echo '<div class="options_group">';
+    
+    // Checkbox to enable local delivery
     woocommerce_wp_checkbox(array(
         'id' => '_local_delivery_enabled',
         'label' => __('Enable Local Delivery', 'woocommerce'),
     ));
 
-    woocommerce_wp_select(array(
+    // Number input for custom delivery radius
+    woocommerce_wp_text_input(array(
         'id' => '_local_delivery_radius',
         'label' => __('Delivery Radius (miles)', 'woocommerce'),
-        'options' => array(
-            '10' => __('10 miles', 'woocommerce'),
-            '15' => __('15 miles', 'woocommerce'),
-            '25' => __('25 miles', 'woocommerce'),
+        'desc_tip' => true,
+        'description' => __('Enter the delivery radius in miles.', 'woocommerce'),
+        'type' => 'number',
+        'custom_attributes' => array(
+            'step' => '0.1', // Allow fractional miles
+            'min' => '1',    // Minimum value allowed
         ),
     ));
+    
     echo '</div>';
 }
 

@@ -2,9 +2,11 @@
 
 if (!defined('ABSPATH')) exit; // Exit if accessed directly
 
-class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method {
+class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
+{
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->id = 'local_delivery';
         $this->method_title = __('Local Delivery', 'woocommerce');
         $this->method_description = __('Delivers within a specified mile radius.', 'woocommerce');
@@ -12,14 +14,18 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method {
         $this->init();
     }
 
-    public function init() {
+    public function init()
+    {
         $this->init_form_fields();
         $this->init_settings();
         $this->title = $this->get_option('title');
         add_action('woocommerce_update_options_shipping_' . $this->id, array($this, 'process_admin_options'));
+        add_action('woocommerce_checkout_process', array($this, 'validate_local_delivery_distance'));
+        add_action('woocommerce_after_calculate_totals', array($this, 'validate_local_delivery_distance'));
     }
 
-    public function init_form_fields() {
+    public function init_form_fields()
+    {
         $this->form_fields = array(
             'title' => array(
                 'title' => __('Title', 'woocommerce'),
@@ -30,7 +36,8 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method {
         );
     }
 
-    public function calculate_shipping($package = array()) {
+    public function calculate_shipping($package = array())
+    {
         $destination = $package['destination'];
         $distance = $this->get_distance($destination['address'], $destination['city'], $destination['postcode']);
         $selected_radius = $this->get_max_radius_for_cart();
@@ -45,7 +52,8 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method {
         }
     }
 
-    private function get_distance($address, $city, $postcode) {
+    private function get_distance($address, $city, $postcode)
+    {
         $store_lat = get_option('store_latitude');
         $store_lng = get_option('store_longitude');
         $query = urlencode("$address, $city, $postcode");
@@ -65,16 +73,18 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method {
         return 99999;
     }
 
-    private function haversine_distance($lat1, $lon1, $lat2, $lon2) {
+    private function haversine_distance($lat1, $lon1, $lat2, $lon2)
+    {
         $earth_radius = 3959; // miles
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat/2) * sin($dLat/2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon/2) * sin($dLon/2);
-        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+        $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
         return $earth_radius * $c;
     }
 
-    private function get_max_radius_for_cart() {
+    private function get_max_radius_for_cart()
+    {
         $max_radius = 0;
         foreach (WC()->cart->get_cart() as $cart_item) {
             $product_id = $cart_item['product_id'];
@@ -84,5 +94,35 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method {
             }
         }
         return $max_radius;
+    }
+
+    public function validate_local_delivery_distance()
+    {
+        // Ensure we only validate if a shipping address is provided
+        if (empty(WC()->customer->get_shipping_postcode()) || empty(WC()->customer->get_shipping_city())) {
+            return; // Skip validation if address isn't set yet
+        }
+        
+        $max_radius = $this->get_max_radius_for_cart();
+        $out_of_range_products = [];
+
+        foreach (WC()->cart->get_cart() as $cart_item) {
+            $product_id = $cart_item['product_id'];
+            if (get_post_meta($product_id, '_local_delivery_enabled', true) === 'yes') {
+                error_log("true");
+                $distance = $this->get_distance(
+                    WC()->customer->get_billing_address(),
+                    WC()->customer->get_billing_city(),
+                    WC()->customer->get_billing_postcode()
+                );
+                if ($distance > $max_radius) {
+                    $out_of_range_products[] = get_the_title($product_id);
+                }
+            }
+        }
+
+        if (!empty($out_of_range_products)) {
+            wc_add_notice(__('The following products cannot be delivered to your address and must be removed from the cart: ') . implode(', ', $out_of_range_products), 'error');
+        }
     }
 }
