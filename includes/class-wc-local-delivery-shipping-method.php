@@ -1,6 +1,7 @@
 <?php
 
 if (!defined('ABSPATH')) exit; // Exit if accessed directly
+require_once plugin_dir_path(__FILE__) . 'class-distance-calculator.php';
 
 class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
 {
@@ -89,7 +90,7 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         $delivery_cost = (float) $this->get_option('delivery_cost', 5.00);
         
         // Get distance
-        $distance = $this->get_distance($shipping_address, $shipping_city, $shipping_postcode);
+        $distance = Distance_Calculator::get_distance($shipping_address, $shipping_city, $shipping_postcode);
         
         // Store calculated distance in session for later use
         WC()->session->set('local_delivery_calculated_distance', $distance);
@@ -173,7 +174,7 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
                 return;
             }
             
-            $distance = $this->get_distance($shipping_address, $shipping_city, $shipping_postcode);
+            $distance = Distance_Calculator::get_distance($shipping_address, $shipping_city, $shipping_postcode);
         }
         
         // Block checkout if outside delivery radius
@@ -239,51 +240,5 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         }
         
         return $local_delivery_product_names;
-    }
-    
-    /**
-     * Get distance between store and customer address
-     */
-    private function get_distance($address, $city, $postcode)
-    {
-        $store_lat = get_option('store_latitude');
-        $store_lng = get_option('store_longitude');
-        
-        if (empty($store_lat) || empty($store_lng)) {
-            return 99999; // Fallback if store coordinates not set
-        }
-        
-        $query = urlencode("$address, $city, $postcode");
-        $url = "https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=1";
-        $response = wp_remote_get($url, array(
-            'timeout' => 10,
-            'user-agent' => 'WordPress/WooCommerce Local Delivery Plugin'
-        ));
-        
-        if (is_wp_error($response)) return 99999; // Fallback to large distance
-        
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body);
-        
-        if (!empty($data) && isset($data[0]->lat, $data[0]->lon)) {
-            $lat = $data[0]->lat;
-            $lng = $data[0]->lon;
-            return $this->haversine_distance($store_lat, $store_lng, $lat, $lng);
-        }
-        
-        return 99999;
-    }
-    
-    /**
-     * Calculate distance using Haversine formula
-     */
-    private function haversine_distance($lat1, $lon1, $lat2, $lon2)
-    {
-        $earth_radius = 3959; // miles
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        return $earth_radius * $c;
     }
 }
