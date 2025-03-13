@@ -95,7 +95,6 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         // Store calculated distance in session for later use
         WC()->session->set('local_delivery_calculated_distance', $distance);
         WC()->session->set('local_delivery_products', $local_delivery_product_names);
-        WC()->session->set('local_delivery_max_radius', $max_radius);
         
         // Add rate if within delivery radius
         if ($distance <= $max_radius) {
@@ -130,7 +129,7 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         
         // Get distance from session if available
         $distance = WC()->session->get('local_delivery_calculated_distance');
-        $max_radius = WC()->session->get('local_delivery_max_radius', $this->get_option('delivery_radius', 10));
+        $max_radius = (float) $this->get_option('delivery_radius', 10);
         
         // If distance isn't set yet, we might not have a complete address
         if ($distance === null) {
@@ -144,7 +143,9 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
                              __(' Please remove these items to proceed with checkout.', 'woocommerce');
             
             // Add error notice - wc_add_notice ensures it's only added once
-            wc_add_notice($error_message, 'error');
+            if (!wc_has_notice($error_message, 'error')) {
+                wc_add_notice($error_message, 'error');
+            }
         }
     }
     
@@ -161,7 +162,7 @@ class WC_Local_Delivery_Shipping_Method extends WC_Shipping_Method
         
         // Get distance from session
         $distance = WC()->session->get('local_delivery_calculated_distance');
-        $max_radius = WC()->session->get('local_delivery_max_radius', $this->get_option('delivery_radius', 10));
+        $max_radius = (float) $this->get_option('delivery_radius', 10);
         
         // If no distance is set, we need to calculate it
         if ($distance === null) {
